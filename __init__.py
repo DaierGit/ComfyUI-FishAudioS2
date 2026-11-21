@@ -40,18 +40,19 @@ os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 
 logger = logging.getLogger("FishAudioS2")
-logger.handlers.clear()
-logger.addHandler(logging.NullHandler())
 logger.propagate = False
-logger.disabled = True
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("[FishAudioS2] %(message)s"))
+    logger.addHandler(_handler)
+logger.setLevel(logging.ERROR)
 
-# Silenciar totalmente Loguru (fish_speech y cualquier módulo) para que no imprima nada en consola
+# Silenciar logs internos verbosos de fish_speech (Loguru) para no saturar la consola
 try:
     from loguru import logger as _loguru_logger
     _loguru_logger.remove()
     _loguru_logger.disable("fish_speech")
     _loguru_logger.disable("tools")
-    _loguru_logger.disable("")
 except Exception:
     pass
 
@@ -350,41 +351,35 @@ def _ensure_dependencies() -> bool:
 NODE_CLASS_MAPPINGS: Dict[str, Any] = {}
 NODE_DISPLAY_NAME_MAPPINGS: Dict[str, str] = {}
 
-if _ensure_fish_source() and _ensure_dependencies():
-    try:
-        from .nodes.loader import _register_folder
-        _register_folder()
+_ensure_fish_source()
+try:
+    _ensure_dependencies()
+except Exception as err:
+    logger.error(f"Dependency check warning: {err}")
 
-        from .nodes.tts_node import FishS2TTS
-        from .nodes.voice_clone_node import FishS2VoiceCloneTTS
-        from .nodes.multi_speaker_node import FishS2MultiSpeakerTTS
-        from .nodes.multi_speaker_split_node import FishS2MultiSpeakerSplitTTS
+try:
+    from .nodes.loader import _register_folder
+    _register_folder()
 
-        NODE_CLASS_MAPPINGS = {
-            "FishS2TTS": FishS2TTS,
-            "FishS2VoiceCloneTTS": FishS2VoiceCloneTTS,
-            "FishS2MultiSpeakerTTS": FishS2MultiSpeakerTTS,
-            "FishS2MultiSpeakerSplitTTS": FishS2MultiSpeakerSplitTTS,
-        }
+    from .nodes.tts_node import FishS2TTS
+    from .nodes.voice_clone_node import FishS2VoiceCloneTTS
+    from .nodes.multi_speaker_node import FishS2MultiSpeakerTTS
+    from .nodes.multi_speaker_split_node import FishS2MultiSpeakerSplitTTS
 
-        NODE_DISPLAY_NAME_MAPPINGS = {
-            "FishS2TTS": "Fish S2 TTS",
-            "FishS2VoiceCloneTTS": "Fish S2 Voice Clone TTS",
-            "FishS2MultiSpeakerTTS": "Fish S2 Multi-Speaker TTS",
-            "FishS2MultiSpeakerSplitTTS": "Fish S2 Multi-Speaker Split TTS",
-        }
+    NODE_CLASS_MAPPINGS = {
+        "FishS2TTS": FishS2TTS,
+        "FishS2VoiceCloneTTS": FishS2VoiceCloneTTS,
+        "FishS2MultiSpeakerTTS": FishS2MultiSpeakerTTS,
+        "FishS2MultiSpeakerSplitTTS": FishS2MultiSpeakerSplitTTS,
+    }
 
-        logger.info(
-            f"Registered {len(NODE_CLASS_MAPPINGS)} nodes "
-            f"(v{__version__}): {', '.join(NODE_DISPLAY_NAME_MAPPINGS.values())}"
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to register nodes: {e}", exc_info=True)
-else:
-    logger.warning(
-        "FishAudioS2 nodes not registered — "
-        "fix dependency errors above and restart ComfyUI."
-    )
+    NODE_DISPLAY_NAME_MAPPINGS = {
+        "FishS2TTS": "Fish S2 TTS",
+        "FishS2VoiceCloneTTS": "Fish S2 Voice Clone TTS",
+        "FishS2MultiSpeakerTTS": "Fish S2 Multi-Speaker TTS",
+        "FishS2MultiSpeakerSplitTTS": "Fish S2 Multi-Speaker Split TTS",
+    }
+except Exception as e:
+    logger.error(f"Failed to register nodes: {e}", exc_info=True)
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "__version__"]
